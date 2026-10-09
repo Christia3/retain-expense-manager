@@ -6,38 +6,43 @@ import { useAuth } from '../context/AuthContext';
 function LoginPage() {
   const navigate = useNavigate();
 
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (
+  const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
     setError('');
 
-    const success = login(email, password);
+    try {
+      await login(email, password);
 
-    if (success) {
+      // Login was successful
       navigate('/dashboard');
-    } else {
-      setError(
-        'Please enter your email and password.'
-      );
+    } catch (error) {
+      // Login failed
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError(
+          'Unable to sign in. Please check your email and password.'
+        );
+      }
     }
   };
 
   return (
     <div className="auth-page">
-
       <div className="auth-card">
-        
+
         <div className="auth-logo">
-    Retain
-  </div>
+          Retain
+        </div>
 
         <div className="auth-header">
           <h1>Welcome Back</h1>
@@ -92,8 +97,9 @@ function LoginPage() {
           <button
             type="submit"
             className="auth-button"
+            disabled={loading}
           >
-            Sign In
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
 
         </form>
@@ -106,7 +112,6 @@ function LoginPage() {
         </p>
 
       </div>
-
     </div>
   );
 }

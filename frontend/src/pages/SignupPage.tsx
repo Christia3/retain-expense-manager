@@ -6,51 +6,44 @@ import { useAuth } from '../context/AuthContext';
 function SignupPage() {
   const navigate = useNavigate();
 
-  const { signup } = useAuth();
+  const { signup, loading } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const [error, setError] = useState('');
 
-  const handleSubmit = (
+  const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
     setError('');
 
-    const success = signup(
-      name,
-      email,
-      password
-    );
+    try {
+      await signup(name, email, password);
 
-    if (success) {
       navigate('/dashboard');
-    } else {
+    } catch (error) {
       setError(
-        'Please complete all fields.'
+        error instanceof Error
+          ? error.message
+          : 'Unable to create your account.'
       );
     }
   };
 
   return (
     <div className="auth-page">
-
       <div className="auth-card">
 
         <div className="auth-logo">
-    Retain
-  </div>
+          Retain
+        </div>
 
         <div className="auth-header">
           <h1>Create Account</h1>
-
-          <p>
-            Start managing your expenses with Retain.
-          </p>
+          <p>Start managing your expenses with Retain.</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -115,8 +108,9 @@ function SignupPage() {
           <button
             type="submit"
             className="auth-button"
+            disabled={loading}
           >
-            Create Account
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
 
         </form>
@@ -129,7 +123,6 @@ function SignupPage() {
         </p>
 
       </div>
-
     </div>
   );
 }

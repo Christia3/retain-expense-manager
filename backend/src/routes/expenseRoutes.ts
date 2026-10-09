@@ -1,0 +1,24 @@
+import { Router } from 'express';
+
+import {
+  getExpenses,
+  getExpenseById,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+} from '../controllers/expenseController';
+
+import { authenticate } from '../middleware/authMiddleware';
+
+const router = Router();
+
+// All expense routes require authentication
+router.use(authenticate);
+
+router.get('/', getExpenses);
+router.get('/:id', getExpenseById);
+router.post('/', createExpense);
+router.put('/:id', updateExpense);
+router.delete('/:id', deleteExpense);
+
+export default router;

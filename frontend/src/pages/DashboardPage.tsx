@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -11,6 +10,7 @@ import { fetchBudget } from '../redux/budgetSlice';
 function DashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
 
+  // Get expenses from Redux.
   const expenses = useSelector(
     (state: RootState) => state.expenses.expenses
   );
@@ -23,6 +23,7 @@ function DashboardPage() {
     (state: RootState) => state.expenses.error
   );
 
+  // Get the monthly budget from Redux.
   const monthlyBudget = useSelector(
     (state: RootState) => state.budget.monthlyBudget
   );
@@ -35,7 +36,7 @@ function DashboardPage() {
     (state: RootState) => state.budget.error
   );
 
-  // Load real expenses and the current month's budget.
+  // Load expenses and the current month's budget.
   useEffect(() => {
     if (expenseStatus === 'idle') {
       dispatch(fetchExpenses());
@@ -46,13 +47,16 @@ function DashboardPage() {
     }
   }, [dispatch, expenseStatus, budgetStatus]);
 
+  // Get the current month and year.
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
   // Keep only expenses from the current month.
   const currentMonthExpenses = expenses.filter((expense) => {
-    const expenseDate = new Date(`${expense.date.slice(0, 10)}T00:00:00`);
+    const expenseDate = new Date(
+      `${expense.date.slice(0, 10)}T00:00:00`
+    );
 
     return (
       expenseDate.getMonth() === currentMonth &&
@@ -60,13 +64,13 @@ function DashboardPage() {
     );
   });
 
-  // Calculate total spending.
+  // Calculate total spending for the current month.
   const totalSpent = currentMonthExpenses.reduce(
     (total, expense) => total + expense.amount,
     0
   );
 
-  // Calculate remaining budget.
+  // Calculate the remaining budget.
   const remainingBudget = monthlyBudget - totalSpent;
 
   // Find the highest individual expense.
@@ -87,11 +91,37 @@ function DashboardPage() {
     return totals;
   }, {});
 
-  // Show the five most recent expenses.
+  // Get the five most recent expenses.
   const recentExpenses = [...currentMonthExpenses]
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => {
+      return (
+        new Date(b.date).getTime() -
+        new Date(a.date).getTime()
+      );
+    })
     .slice(0, 5);
 
+  // Format currency consistently.
+  const formatCurrency = (amount: number) =>
+    amount.toLocaleString('en-CA', {
+      style: 'currency',
+      currency: 'CAD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  // Format dates for display.
+  const formatDate = (date: string) =>
+    new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString(
+      'en-CA',
+      {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }
+    );
+
+  // Show a loading screen while expenses are loading.
   if (expenseStatus === 'loading' && expenses.length === 0) {
     return (
       <div className="dashboard-page">
@@ -100,6 +130,7 @@ function DashboardPage() {
     );
   }
 
+  // Show an error if expenses could not be loaded.
   if (expenseStatus === 'failed' && expenses.length === 0) {
     return (
       <div className="dashboard-page">
@@ -134,7 +165,7 @@ function DashboardPage() {
       <div className="summary-grid">
         <div className="summary-card">
           <span>Total Spent</span>
-          <h2>${totalSpent.toFixed(2)}</h2>
+          <h2>{formatCurrency(totalSpent)}</h2>
           <p>This month</p>
         </div>
 
@@ -144,7 +175,7 @@ function DashboardPage() {
           <h2>
             {budgetStatus === 'loading'
               ? 'Loading...'
-              : `$${monthlyBudget.toFixed(2)}`}
+              : formatCurrency(monthlyBudget)}
           </h2>
 
           <p>
@@ -163,8 +194,12 @@ function DashboardPage() {
         <div className="summary-card">
           <span>Remaining</span>
 
-          <h2 className={remainingBudget < 0 ? 'negative-amount' : ''}>
-            ${remainingBudget.toFixed(2)}
+          <h2
+            className={
+              remainingBudget < 0 ? 'negative-amount' : ''
+            }
+          >
+            {formatCurrency(remainingBudget)}
           </h2>
 
           <p>
@@ -180,7 +215,7 @@ function DashboardPage() {
           <span>Highest Expense</span>
 
           <h2>
-            ${highestExpense ? highestExpense.amount.toFixed(2) : '0.00'}
+            {formatCurrency(highestExpense?.amount ?? 0)}
           </h2>
 
           <p>{highestExpense?.title ?? 'No expenses yet'}</p>
@@ -189,6 +224,7 @@ function DashboardPage() {
 
       {/* Category spending and recent expenses */}
       <div className="dashboard-grid">
+        {/* Spending by category */}
         <section className="dashboard-card">
           <div className="card-header">
             <div>
@@ -204,22 +240,32 @@ function DashboardPage() {
           ) : (
             <div className="category-list">
               {Object.entries(categoryTotals)
-                .sort(([, amountA], [, amountB]) => amountB - amountA)
+                .sort(
+                  ([, amountA], [, amountB]) =>
+                    amountB - amountA
+                )
                 .map(([category, amount]) => {
                   const percentage =
-                    totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
+                    totalSpent > 0
+                      ? (amount / totalSpent) * 100
+                      : 0;
 
                   return (
-                    <div className="category-item" key={category}>
+                    <div
+                      className="category-item"
+                      key={category}
+                    >
                       <div className="category-info">
                         <span>{category}</span>
-                        <span>${amount.toFixed(2)}</span>
+                        <span>{formatCurrency(amount)}</span>
                       </div>
 
                       <div className="progress-bar">
                         <div
                           className="progress-fill"
-                          style={{ width: `${percentage}%` }}
+                          style={{
+                            width: `${percentage}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -229,6 +275,7 @@ function DashboardPage() {
           )}
         </section>
 
+        {/* Recent expenses */}
         <section className="dashboard-card">
           <div className="card-header">
             <div>
@@ -236,7 +283,16 @@ function DashboardPage() {
               <p>Your latest transactions</p>
             </div>
 
-            <Link to="/expenses">View all</Link>
+            <Link
+  to={
+    localStorage.getItem('retain_user') &&
+    JSON.parse(localStorage.getItem('retain_user') || '{}').role === 'ADMIN'
+      ? '/admin/expenses'
+      : '/expenses'
+  }
+>
+  View all
+</Link>
           </div>
 
           {recentExpenses.length === 0 ? (
@@ -246,15 +302,20 @@ function DashboardPage() {
           ) : (
             <div className="recent-expenses">
               {recentExpenses.map((expense) => (
-                <div className="recent-expense-item" key={expense.id}>
-                  <div>
+                <div
+                  className="recent-expense-item"
+                  key={expense.id}
+                >
+                  <div className="recent-expense-details">
                     <strong>{expense.title}</strong>
                     <span>{expense.category}</span>
                   </div>
 
-                  <div>
-                    <strong>${expense.amount.toFixed(2)}</strong>
-                    <span>{expense.date}</span>
+                  <div className="recent-expense-meta">
+                    <strong>
+                      {formatCurrency(expense.amount)}
+                    </strong>
+                    <span>{formatDate(expense.date)}</span>
                   </div>
                 </div>
               ))}

@@ -1,7 +1,9 @@
 import { Router } from 'express';
-
-import { getAdminInsights } from '../controllers/adminController';
-
+import {
+  getAdminInsights,
+  getAdminUsers,
+  getAdminExpenses,
+} from '../controllers/adminController';
 import {
   authenticate,
   requireAdmin,
@@ -9,13 +11,12 @@ import {
 
 const router = Router();
 
-// All admin routes require authentication
+// All routes below require an authenticated administrator.
 router.use(authenticate);
-
-// All routes in this file require ADMIN role
 router.use(requireAdmin);
 
-// Admin insights
 router.get('/insights', getAdminInsights);
+router.get('/users', getAdminUsers);
+router.get('/expenses', getAdminExpenses);
 
 export default router;

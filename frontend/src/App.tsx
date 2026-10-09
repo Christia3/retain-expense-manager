@@ -1,3 +1,4 @@
+
 import './App.css';
 
 import {
@@ -14,7 +15,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 
-// Regular pages
+// Regular user pages
 import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
 import AddExpensePage from './pages/AddExpensePage';
@@ -28,45 +29,24 @@ import SignupPage from './pages/SignupPage';
 // Admin pages
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
+import AdminExpensesPage from './pages/AdminExpensesPage';
+import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public authentication routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
-        {/* =========================
-            AUTHENTICATION ROUTES
-        ========================= */}
-
-        <Route
-          path="/login"
-          element={<LoginPage />}
-        />
-
-        <Route
-          path="/signup"
-          element={<SignupPage />}
-        />
-
-        {/* =========================
-            PROTECTED USER ROUTES
-        ========================= */}
-
+        {/* Protected regular user routes */}
         <Route element={<ProtectedRoute />}>
-
-          <Route
-            path="/"
-            element={<DashboardLayout />}
-          >
-
+          <Route path="/" element={<DashboardLayout />}>
             <Route
               index
-              element={
-                <Navigate
-                  to="/dashboard"
-                  replace
-                />
-              }
+              element={<Navigate to="/dashboard" replace />}
             />
 
             <Route
@@ -98,52 +78,44 @@ function App() {
               path="analytics"
               element={<AnalyticsPage />}
             />
-
           </Route>
-
         </Route>
 
-        {/* =========================
-            PROTECTED ADMIN ROUTES
-        ========================= */}
-
+        {/* Protected administrator routes */}
         <Route element={<AdminRoute />}>
-
-          <Route
-            path="/admin"
-            element={<DashboardLayout />}
-          >
-
-            {/* Admin Dashboard */}
+          <Route path="/admin" element={<DashboardLayout />}>
             <Route
               index
               element={<AdminDashboardPage />}
             />
 
-            {/* Admin Category Management */}
             <Route
               path="categories"
               element={<AdminCategoriesPage />}
             />
 
-          </Route>
+            <Route
+              path="expenses"
+              element={<AdminExpensesPage />}
+            />
 
+            <Route
+              path="analytics"
+              element={<AdminAnalyticsPage />}
+            />
+
+            <Route
+              path="users"
+              element={<AdminUsersPage />}
+            />
+          </Route>
         </Route>
 
-        {/* =========================
-            FALLBACK ROUTE
-        ========================= */}
-
+        {/* Redirect unknown URLs */}
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/dashboard"
-              replace
-            />
-          }
+          element={<Navigate to="/" replace />}
         />
-
       </Routes>
     </BrowserRouter>
   );

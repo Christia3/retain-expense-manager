@@ -1,10 +1,10 @@
+
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-// ===============================
 // GET ALL CATEGORIES
-// ===============================
 export const getCategories = async (
   _req: Request,
   res: Response
@@ -26,9 +26,7 @@ export const getCategories = async (
   }
 };
 
-// ===============================
 // CREATE CATEGORY - ADMIN ONLY
-// ===============================
 export const createCategory = async (
   req: AuthRequest,
   res: Response
@@ -36,15 +34,27 @@ export const createCategory = async (
   try {
     const { name, description } = req.body;
 
-    if (!name) {
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({
         message: 'Category name is required.',
       });
     }
 
+    if (
+      description !== undefined &&
+      description !== null &&
+      typeof description !== 'string'
+    ) {
+      return res.status(400).json({
+        message: 'Description must be a string.',
+      });
+    }
+
+    const normalizedName = name.trim();
+
     const existingCategory = await prisma.category.findUnique({
       where: {
-        name,
+        name: normalizedName,
       },
     });
 
@@ -56,8 +66,11 @@ export const createCategory = async (
 
     const category = await prisma.category.create({
       data: {
-        name,
-        description: description || null,
+        name: normalizedName,
+        description:
+          typeof description === 'string' && description.trim()
+            ? description.trim()
+            : null,
       },
     });
 
@@ -66,6 +79,16 @@ export const createCategory = async (
       category,
     });
   } catch (error) {
+    // Handle a duplicate name even if concurrent requests race.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return res.status(409).json({
+        message: 'A category with this name already exists.',
+      });
+    }
+
     console.error('Create category error:', error);
 
     return res.status(500).json({
@@ -74,9 +97,7 @@ export const createCategory = async (
   }
 };
 
-// ===============================
 // UPDATE CATEGORY - ADMIN ONLY
-// ===============================
 export const updateCategory = async (
   req: AuthRequest,
   res: Response
@@ -97,10 +118,32 @@ export const updateCategory = async (
       });
     }
 
-    if (name) {
+    if (
+      name !== undefined &&
+      (typeof name !== 'string' || !name.trim())
+    ) {
+      return res.status(400).json({
+        message: 'Category name cannot be empty.',
+      });
+    }
+
+    if (
+      description !== undefined &&
+      description !== null &&
+      typeof description !== 'string'
+    ) {
+      return res.status(400).json({
+        message: 'Description must be a string.',
+      });
+    }
+
+    const normalizedName =
+      typeof name === 'string' ? name.trim() : undefined;
+
+    if (normalizedName !== undefined) {
       const duplicateCategory = await prisma.category.findFirst({
         where: {
-          name,
+          name: normalizedName,
           NOT: {
             id,
           },
@@ -119,9 +162,13 @@ export const updateCategory = async (
         id,
       },
       data: {
-        name,
+        name: normalizedName,
         description:
-          description !== undefined ? description : undefined,
+          description === undefined
+            ? undefined
+            : typeof description === 'string' && description.trim()
+              ? description.trim()
+              : null,
       },
     });
 
@@ -130,6 +177,15 @@ export const updateCategory = async (
       category,
     });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return res.status(409).json({
+        message: 'A category with this name already exists.',
+      });
+    }
+
     console.error('Update category error:', error);
 
     return res.status(500).json({
@@ -138,9 +194,7 @@ export const updateCategory = async (
   }
 };
 
-// ===============================
 // DELETE CATEGORY - ADMIN ONLY
-// ===============================
 export const deleteCategory = async (
   req: AuthRequest,
   res: Response
@@ -153,7 +207,12 @@ export const deleteCategory = async (
         id,
       },
       include: {
-        expenses: true,
+        expenses: {
+          select: {
+            id: true,
+          },
+          take: 1,
+        },
       },
     });
 
@@ -163,7 +222,7 @@ export const deleteCategory = async (
       });
     }
 
-    // Don't allow deletion if expenses use this category
+    // Do not delete categories that are used by expenses.
     if (category.expenses.length > 0) {
       return res.status(400).json({
         message:
@@ -181,6 +240,18 @@ export const deleteCategory = async (
       message: 'Category deleted successfully.',
     });
   } catch (error) {
+    // The database also prevents deletion if an expense
+    // references this category.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2003'
+    ) {
+      return res.status(400).json({
+        message:
+          'This category cannot be deleted because expenses are using it.',
+      });
+    }
+
     console.error('Delete category error:', error);
 
     return res.status(500).json({

@@ -1,50 +1,74 @@
+
 import { Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-// ===============================
+// Validate the exact YYYY-MM format and calendar month.
+function parseMonth(value: unknown): Date | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
+    return null;
+  }
+
+  const month = new Date(`${value}-01T00:00:00.000Z`);
+
+  return Number.isNaN(month.getTime()) ? null : month;
+}
+
+// Accept finite, non-negative budget amounts.
+// Zero is allowed so users can reset their budget.
+function isValidBudgetAmount(value: unknown): boolean {
+  if (
+    value === '' ||
+    value === null ||
+    value === undefined
+  ) {
+    return false;
+  }
+
+  const amount = Number(value);
+
+  return Number.isFinite(amount) && amount >= 0;
+}
+
 // GET MONTHLY BUDGET
-// ===============================
 export const getBudget = async (
   req: AuthRequest,
   res: Response
 ) => {
   try {
-    const monthParam = req.query.month as string;
+    const monthParam = req.query.month;
+    const month = parseMonth(monthParam);
 
-    if (!monthParam) {
-      return res.status(400).json({
-        message: 'Month is required. Use YYYY-MM format.',
-      });
-    }
-
-    const month = new Date(`${monthParam}-01T00:00:00.000Z`);
-
-    if (isNaN(month.getTime())) {
+    if (!month) {
       return res.status(400).json({
         message: 'Invalid month format. Use YYYY-MM.',
       });
     }
 
+    const userId = req.user!.userId;
+
     const budget = await prisma.budget.findUnique({
       where: {
         userId_month: {
-          userId: req.user!.userId,
+          userId,
           month,
         },
       },
     });
 
-    // Calculate the month's date range
-    const startDate = new Date(month);
+    // Calculate the selected month's date range in UTC.
+    const startDate = month;
     const endDate = new Date(month);
-
     endDate.setUTCMonth(endDate.getUTCMonth() + 1);
 
-    // Calculate total spending for the month
+    // Only count expenses belonging to the authenticated user.
     const expenses = await prisma.expense.findMany({
       where: {
-        userId: req.user!.userId,
+        userId,
         date: {
           gte: startDate,
           lt: endDate,
@@ -60,7 +84,10 @@ export const getBudget = async (
       0
     );
 
-    const budgetAmount = budget ? Number(budget.amount) : 0;
+    const budgetAmount = budget
+      ? Number(budget.amount)
+      : 0;
+
     const remaining = budgetAmount - totalSpent;
 
     let status: 'WITHIN' | 'APPROACHING' | 'OVER';
@@ -92,53 +119,45 @@ export const getBudget = async (
   }
 };
 
-// ===============================
 // CREATE OR UPDATE MONTHLY BUDGET
-// ===============================
 export const setBudget = async (
   req: AuthRequest,
   res: Response
 ) => {
   try {
-    const { month, amount } = req.body;
+    const { month: monthParam, amount } = req.body;
 
-    if (!month || amount === undefined) {
-      return res.status(400).json({
-        message: 'Month and amount are required.',
-      });
-    }
+    const month = parseMonth(monthParam);
 
-    const budgetAmount = Number(amount);
-
-    if (isNaN(budgetAmount) || budgetAmount < 0) {
-      return res.status(400).json({
-        message: 'Budget amount must be a valid positive number.',
-      });
-    }
-
-    const budgetMonth = new Date(
-      `${month}-01T00:00:00.000Z`
-    );
-
-    if (isNaN(budgetMonth.getTime())) {
+    if (!month) {
       return res.status(400).json({
         message: 'Invalid month format. Use YYYY-MM.',
       });
     }
 
+    if (!isValidBudgetAmount(amount)) {
+      return res.status(400).json({
+        message:
+          'Budget amount must be a valid non-negative number.',
+      });
+    }
+
+    const budgetAmount = Number(amount);
+    const userId = req.user!.userId;
+
     const budget = await prisma.budget.upsert({
       where: {
         userId_month: {
-          userId: req.user!.userId,
-          month: budgetMonth,
+          userId,
+          month,
         },
       },
       update: {
         amount: budgetAmount,
       },
       create: {
-        userId: req.user!.userId,
-        month: budgetMonth,
+        userId,
+        month,
         amount: budgetAmount,
       },
     });

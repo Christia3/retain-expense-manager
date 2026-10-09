@@ -1,5 +1,5 @@
-
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiRequest } from '../services/api';
 
 interface AdminCategoryInsight {
@@ -16,9 +16,7 @@ interface AdminRecentExpense {
   amount: number | string;
   date: string;
   createdAt: string;
-  category: {
-    name: string;
-  };
+  category: { name: string };
   user: {
     id: string;
     name: string;
@@ -47,53 +45,58 @@ interface AdminInsights {
   recentUsers: AdminRecentUser[];
 }
 
+function formatMoney(value: number | string): string {
+  return Number(value).toLocaleString('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function AdminDashboardPage() {
   const [insights, setInsights] = useState<AdminInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
+  async function loadInsights() {
+    try {
+      setLoading(true);
+      setError('');
 
-    async function loadInsights() {
-      try {
-        setLoading(true);
-        setError('');
+      const token = localStorage.getItem('retain_token');
 
-        const token = localStorage.getItem('retain_token');
-
-        if (!token) {
-          throw new Error('Please sign in to access admin insights.');
-        }
-
-        const data = await apiRequest<AdminInsights>(
-          '/admin/insights',
-          { token }
-        );
-
-        if (!cancelled) {
-          setInsights(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Failed to load admin insights.'
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (!token) {
+        throw new Error('Please sign in to access admin insights.');
       }
+
+      const data = await apiRequest<AdminInsights>(
+        '/admin/insights',
+        { token }
+      );
+
+      setInsights(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to load admin insights.'
+      );
+    } finally {
+      setLoading(false);
     }
+  }
 
-    loadInsights();
-
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    void loadInsights();
   }, []);
 
   if (loading) {
@@ -105,6 +108,10 @@ function AdminDashboardPage() {
             <p>Loading platform statistics...</p>
           </div>
         </header>
+
+        <section className="dashboard-card admin-message">
+          <p>Gathering platform activity and spending data...</p>
+        </section>
       </div>
     );
   }
@@ -119,192 +126,222 @@ function AdminDashboardPage() {
           </div>
         </header>
 
-        <div className="dashboard-card">
+        <section className="dashboard-card admin-message">
           <p role="alert">
             {error || 'Admin insights are unavailable.'}
           </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-          >
+
+          <button type="button" onClick={() => void loadInsights()}>
             Try Again
           </button>
-        </div>
+        </section>
       </div>
     );
   }
 
-  const topCategories = insights.top5Categories;
-  const bottomCategories = insights.bottom5Categories;
-  const recentExpenses = insights.recentExpenses;
-  const recentUsers = insights.recentUsers;
+  const renderCategoryList = (
+    categories: AdminCategoryInsight[],
+    showProgress = false
+  ) => {
+    if (categories.length === 0) {
+      return <p className="admin-empty">No category data available.</p>;
+    }
+
+    const maxTotal = Math.max(
+      ...categories.map((category) => Number(category.total)),
+      1
+    );
+
+    return (
+      <div className="admin-list">
+        {categories.map((category) => {
+          const percentage =
+            (Number(category.total) / maxTotal) * 100;
+
+          return (
+            <div className="admin-category-item" key={category.id}>
+              <div className="admin-list-item">
+                <div className="admin-list-details">
+                  <strong>{category.name}</strong>
+                  <span>
+                    {category.expenseCount}{' '}
+                    {category.expenseCount === 1
+                      ? 'expense'
+                      : 'expenses'}
+                  </span>
+                </div>
+
+                <strong className="admin-list-amount">
+                  {formatMoney(category.total)}
+                </strong>
+              </div>
+
+              {showProgress && (
+                <div
+                  className="admin-category-progress"
+                  role="progressbar"
+                  aria-label={`${category.name} spending`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(percentage)}
+                >
+                  <div
+                    className="admin-category-progress-fill"
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="admin-page">
+      {/* Page header */}
       <header className="page-header">
         <div>
           <h1>Admin Dashboard</h1>
-          <p>Overview of Retain activity and spending.</p>
+          <p>Monitor users, expenses, and spending across Retain.</p>
         </div>
+
+        <button
+          type="button"
+          className="admin-refresh-button"
+          onClick={() => void loadInsights()}
+        >
+          Refresh data
+        </button>
       </header>
 
-      {/* Platform Overview */}
-      <div className="summary-grid">
+      {/* Platform statistics */}
+      <div className="summary-grid admin-summary-grid">
         <div className="summary-card">
           <span>Total Users</span>
-          <h2>{insights.totalUsers}</h2>
+          <h2>{insights.totalUsers.toLocaleString()}</h2>
           <p>Registered accounts</p>
         </div>
 
         <div className="summary-card">
           <span>Total Expenses</span>
-          <h2>{insights.totalExpenses}</h2>
+          <h2>{insights.totalExpenses.toLocaleString()}</h2>
           <p>Across all users</p>
         </div>
 
         <div className="summary-card">
-          <span>Total Expense Value</span>
-          <h2>
-            ${Number(insights.totalExpenseValue).toFixed(2)}
-          </h2>
-          <p>Across all recorded expenses</p>
+          <span>Total Spending</span>
+          <h2>{formatMoney(insights.totalExpenseValue)}</h2>
+          <p>All recorded expenses</p>
         </div>
 
         <div className="summary-card">
-          <span>Current Month</span>
-          <h2>{insights.currentMonthExpenses}</h2>
+          <span>This Month</span>
+          <h2>{insights.currentMonthExpenses.toLocaleString()}</h2>
           <p>
-            ${Number(insights.currentMonthExpenseValue).toFixed(2)} spent
+            {formatMoney(insights.currentMonthExpenseValue)} spent
           </p>
         </div>
       </div>
 
-      {/* Category Insights */}
-      <div className="dashboard-grid">
+      {/* Quick navigation */}
+      <section className="admin-quick-links">
+        <Link to="/admin/users" className="admin-quick-link">
+          <span className="admin-quick-link-icon">♙</span>
+          <span>
+            <strong>Manage Users</strong>
+            <small>View registered accounts</small>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+
+        <Link to="/admin/expenses" className="admin-quick-link">
+          <span className="admin-quick-link-icon">▤</span>
+          <span>
+            <strong>All Expenses</strong>
+            <small>Review platform transactions</small>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+
+        <Link to="/admin/categories" className="admin-quick-link">
+          <span className="admin-quick-link-icon">◇</span>
+          <span>
+            <strong>Categories</strong>
+            <small>Manage expense categories</small>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      </section>
+
+      {/* Category rankings */}
+      <div className="dashboard-grid admin-category-grid">
         <section className="dashboard-card">
           <div className="card-header">
             <div>
               <h2>Top 5 Categories</h2>
-              <p>Categories with the highest spending</p>
+              <p>Highest spending by category</p>
             </div>
           </div>
 
-          {topCategories.length === 0 ? (
-            <p>No category data available.</p>
-          ) : (
-            <div className="recent-expenses">
-              {topCategories.map((category) => (
-                <div
-                  className="recent-expense-item"
-                  key={category.id}
-                >
-                  <div>
-                    <strong>{category.name}</strong>
-                    <span>{category.expenseCount} expenses</span>
-                  </div>
-                  <strong>
-                    ${Number(category.total).toFixed(2)}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderCategoryList(insights.top5Categories)}
         </section>
 
         <section className="dashboard-card">
           <div className="card-header">
             <div>
               <h2>Bottom 5 Categories</h2>
-              <p>Categories with the lowest non-zero spending</p>
+              <p>Lowest categories with recorded spending</p>
             </div>
           </div>
 
-          {bottomCategories.length === 0 ? (
-            <p>No category spending data available.</p>
-          ) : (
-            <div className="recent-expenses">
-              {bottomCategories.map((category) => (
-                <div
-                  className="recent-expense-item"
-                  key={category.id}
-                >
-                  <div>
-                    <strong>{category.name}</strong>
-                    <span>{category.expenseCount} expenses</span>
-                  </div>
-                  <strong>
-                    ${Number(category.total).toFixed(2)}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderCategoryList(insights.bottom5Categories)}
         </section>
       </div>
 
-      {/* All Category Spending */}
-      <section className="dashboard-card">
+      {/* Spending across all categories */}
+      <section className="dashboard-card admin-section">
         <div className="card-header">
           <div>
             <h2>Spending by Category</h2>
-            <p>Platform-wide spending across all categories</p>
+            <p>Compare spending across all categories</p>
           </div>
         </div>
 
-        {insights.spendingByCategory.length === 0 ? (
-          <p>No categories available.</p>
-        ) : (
-          <div className="recent-expenses">
-            {insights.spendingByCategory.map((category) => (
-              <div
-                className="recent-expense-item"
-                key={category.id}
-              >
-                <div>
-                  <strong>{category.name}</strong>
-                  <span>{category.expenseCount} expenses</span>
-                </div>
-                <strong>
-                  ${Number(category.total).toFixed(2)}
-                </strong>
-              </div>
-            ))}
-          </div>
-        )}
+        {renderCategoryList(insights.spendingByCategory, true)}
       </section>
 
-      {/* Recent Expenses */}
-      <section className="dashboard-card">
+      {/* Recent expenses */}
+      <section className="dashboard-card admin-section">
         <div className="card-header">
           <div>
             <h2>Recent Expenses</h2>
             <p>Latest recorded expenses across all users</p>
           </div>
+
+          <Link to="/admin/expenses">View all</Link>
         </div>
 
-        {recentExpenses.length === 0 ? (
-          <p>No expenses recorded yet.</p>
+        {insights.recentExpenses.length === 0 ? (
+          <p className="admin-empty">No expenses recorded yet.</p>
         ) : (
-          <div className="recent-expenses">
-            {recentExpenses.map((expense) => (
-              <div
-                className="recent-expense-item"
-                key={expense.id}
-              >
-                <div>
+          <div className="admin-list">
+            {insights.recentExpenses.map((expense) => (
+              <div className="admin-list-item" key={expense.id}>
+                <div className="admin-list-details">
                   <strong>{expense.title}</strong>
                   <span>
                     {expense.category.name} · {expense.user.name}
                   </span>
+                  <span>{expense.user.email}</span>
                 </div>
 
-                <div>
-                  <strong>
-                    ${Number(expense.amount).toFixed(2)}
+                <div className="admin-list-details admin-list-right">
+                  <strong className="admin-list-amount">
+                    {formatMoney(expense.amount)}
                   </strong>
-                  <span>
-                    {new Date(expense.createdAt).toLocaleDateString()}
-                  </span>
+                  <span>{formatDate(expense.date)}</span>
                 </div>
               </div>
             ))}
@@ -312,34 +349,31 @@ function AdminDashboardPage() {
         )}
       </section>
 
-      {/* Recent Users */}
-      <section className="dashboard-card">
+      {/* Recently registered users */}
+      <section className="dashboard-card admin-section">
         <div className="card-header">
           <div>
             <h2>Recent Users</h2>
             <p>Latest registered accounts</p>
           </div>
+
+          <Link to="/admin/users">View all</Link>
         </div>
 
-        {recentUsers.length === 0 ? (
-          <p>No users registered yet.</p>
+        {insights.recentUsers.length === 0 ? (
+          <p className="admin-empty">No users registered yet.</p>
         ) : (
-          <div className="recent-expenses">
-            {recentUsers.map((user) => (
-              <div
-                className="recent-expense-item"
-                key={user.id}
-              >
-                <div>
+          <div className="admin-list">
+            {insights.recentUsers.map((user) => (
+              <div className="admin-list-item" key={user.id}>
+                <div className="admin-list-details">
                   <strong>{user.name}</strong>
                   <span>{user.email}</span>
                 </div>
 
-                <div>
+                <div className="admin-list-details admin-list-right">
                   <strong>{user.role}</strong>
-                  <span>
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </span>
+                  <span>{formatDate(user.createdAt)}</span>
                 </div>
               </div>
             ))}

@@ -493,38 +493,6 @@ Potential improvements for future versions include:
 
 These are possible future enhancements and are not necessarily implemented in the current version.
 
-## Contributing
-
-Contributions, suggestions, and bug reports are welcome.
-
-To contribute:
-
-1. Fork the repository.
-2. Create a feature branch.
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-3. Make your changes.
-4. Test the application locally.
-5. Commit your changes.
-
-   ```bash
-   git add .
-   git commit -m "Describe your changes"
-   ```
-
-6. Push your branch.
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-7. Open a pull request describing the changes.
-
-Please avoid committing generated files, local configuration files, database credentials, or secrets.
-
 ## Author
 
 **Retain — Personal Expense & Budget Manager**
@@ -534,6 +502,3 @@ Developed as a full-stack application to demonstrate frontend development, backe
 **GitHub Repository:**  
 https://github.com/Christia3/retain-expense-manager
 
-## License
-
-No license has been specified in this repository yet. If you plan to make the project available for reuse, add a `LICENSE` file and update this section to reflect your chosen license.

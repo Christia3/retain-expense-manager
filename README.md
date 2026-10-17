@@ -185,7 +185,7 @@ retain-expense-manager/
 └── README.md
 ```
 
-*Note: This is a representative structure. Update the folder and file names to match the actual structure in your repository.*
+
 
 ## Getting Started
 

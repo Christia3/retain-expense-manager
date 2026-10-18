@@ -23,9 +23,7 @@ The application combines a responsive React interface with a TypeScript and Expr
 - [State Management](#state-management)
 - [Security Considerations](#security-considerations)
 - [Future Improvements](#future-improvements)
-- [Contributing](#contributing)
 - [Author](#author)
-- [License](#license)
 
 ## Project Overview
 
